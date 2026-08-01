@@ -1,64 +1,93 @@
 import json
-import sys
 from pathlib import Path
 
 
-def test_dockerfile_uses_repo_root_compatible_data_copy():
-    dockerfile = Path(__file__).resolve().parents[1] / "environment" / "Dockerfile"
-    content = dockerfile.read_text(encoding="utf-8")
-    assert "COPY task/environment/data /app/data" in content
+def load():
+    return json.loads(Path("/app/output.json").read_text())
 
 
 def test_output_exists():
-    """The agent must write /app/output.json."""
     assert Path("/app/output.json").exists()
 
 
-def test_output_schema_and_metrics():
-    """The output JSON must contain churn prediction model results."""
-    data = json.loads(Path("/app/output.json").read_text(encoding="utf-8"))
+def test_schema():
 
-    # Validate top-level keys for churn prediction task
-    assert set(data.keys()) == {
-        "dataset",
-        "model",
-        "performance",
-        "feature_importance",
+    d = load()
+
+    assert "summary" in d
+    assert "sensors" in d
+
+    s = d["summary"]
+
+    expected = {
+        "total_sensors",
+        "excellent",
+        "good",
+        "warning",
+        "critical",
+        "average_reliability_index",
     }
 
-    # Validate dataset section
-    assert data["dataset"]["total_customers_initial"] > 0
-    assert data["dataset"]["excluded_test_users"] >= 0
-    assert data["dataset"]["excluded_young_accounts"] >= 0
-    assert data["dataset"]["final_dataset_size"] > 0
-    assert 0 <= data["dataset"]["churn_rate_percent"] <= 100
+    assert expected == set(s.keys())
 
-    # Validate model section
-    assert data["model"]["train_size"] > 0
-    assert data["model"]["test_size"] > 0
 
-    # Validate performance metrics are in valid ranges [0, 1]
-    assert 0 <= data["performance"]["train_accuracy"] <= 1
-    assert 0 <= data["performance"]["test_accuracy"] <= 1
-    assert 0 <= data["performance"]["test_precision"] <= 1
-    assert 0 <= data["performance"]["test_recall"] <= 1
-    assert 0 <= data["performance"]["test_auc_roc"] <= 1
+def test_sensor_schema():
 
-    # Validate feature importance keys
-    expected_features = {
-        "avg_login_days",
-        "avg_features_used",
-        "total_support_tickets",
-        "account_age_months",
-        "support_intensity",
-        "login_features_interaction",
+    d = load()
+
+    for sensor in d["sensors"].values():
+
+        assert set(sensor.keys()) == {
+            "production_line",
+            "average_drift",
+            "maintenance_score",
+            "reliability_index",
+            "health",
+        }
+
+
+def test_health_values():
+
+    d = load()
+
+    allowed = {
+        "EXCELLENT",
+        "GOOD",
+        "WARNING",
+        "CRITICAL",
     }
-    assert set(data["feature_importance"].keys()) == expected_features
 
-    # Validate feature importance values sum to 1.0 (within tolerance)
-    importance_sum = sum(data["feature_importance"].values())
-    assert 0.99 <= importance_sum <= 1.01
+    for sensor in d["sensors"].values():
 
-    # Validate all feature importance values are non-negative
-    for feat_name, importance in data["feature_importance"].items():
-        assert importance >= 0, f"Feature {feat_name} has negative importance: {importance}"
+        assert sensor["health"] in allowed
+
+
+def test_ranges():
+
+    d = load()
+
+    for sensor in d["sensors"].values():
+
+        assert sensor["average_drift"] >= 0
+
+        assert 0 <= sensor["maintenance_score"] <= 100
+
+        assert sensor["reliability_index"] < 120
+
+        assert sensor["reliability_index"] > -100
+
+
+def test_summary_counts():
+
+    d = load()
+
+    s = d["summary"]
+
+    total = (
+        s["excellent"]
+        + s["good"]
+        + s["warning"]
+        + s["critical"]
+    )
+
+    assert total == s["total_sensors"]

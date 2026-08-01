@@ -1,0 +1,6 @@
+sensor_id,calibrated_value,last_calibration_days
+S001,100.0,20
+S002,98.0,35
+S003,120.0,10
+S004,90.0,60
+S005,110.0,15
