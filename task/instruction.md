@@ -1,49 +1,53 @@
-You are running an A/B test on a payment-processing pipeline. You have been given three data files that contain payment transaction records, experiment assignments, and a list of test-mode transactions to exclude. Your job is to reconcile the raw transaction log, apply experiment logic, and compute the treatment effect on transaction success rates.
+You have customer data and need to predict churn. You are given three CSV files containing customer attributes, monthly usage metrics, and churn labels. Your task is to: (1) clean and validate the data, (2) engineer features for a predictive model, (3) train a logistic regression classifier, (4) evaluate model performance, and (5) compute feature importance.
 
 Files in /app/data:
-- transactions.csv: raw transaction log (timestamp, user_id, transaction_id, success, amount)
-- assignments.csv: experiment cohort assignments (user_id, variant)
-- test_ids.txt: list of test user IDs to exclude from analysis
+- customers.csv: customer_id, account_age_months, subscription_tier (basic/premium/enterprise), region (US/EU/APAC)
+- usage.csv: customer_id, month, login_days, features_used, support_tickets, payment_method (card/ach/paypal)
+- churn.csv: customer_id, churned (0/1)
 
-Clean the dataset as follows (in order):
-1. For each user_id, keep only the first transaction in chronological order (by timestamp); discard later duplicates.
-2. Remove all transactions from user IDs listed in test_ids.txt.
-3. Remove all transactions from user IDs that do not appear in assignments.csv.
-4. Normalize all timestamps to UTC and group by calendar date (YYYY-MM-DD).
+Data cleaning (in order):
+1. Remove customers with account_age_months < 3 (excluded from churn analysis).
+2. Remove customers in the exclusion list (test_customers.txt).
+3. For each customer, aggregate usage.csv to compute: avg_login_days, avg_features_used, total_support_tickets over all months.
+4. Merge the three datasets; drop rows with missing values.
 
-For each variant (control/treatment), compute:
-- total_users: distinct user_id count
-- total_transactions: count of transactions
-- success_count: count of transactions where success=true
-- success_rate: success_count / total_transactions
-- total_amount: sum of transaction amounts (for successful transactions only)
+Feature engineering:
+- Create interaction: (login_days) × (features_used)
+- Create: support_intensity = support_tickets / account_age_months
+- Encode categorical: subscription_tier and region as binary (one-hot)
+
+Train logistic regression on 80% of data (random split, seed=42). Evaluate on 20% test set.
 
 Produce a JSON report at /app/output.json with this schema:
 {
-  "date_range": {"first": "YYYY-MM-DD", "last": "YYYY-MM-DD"},
-  "data_quality": {
-    "duplicates_per_user_removed": 0,
-    "test_transactions_excluded": 0,
-    "unassigned_users_excluded": 0
+  "dataset": {
+    "total_customers_initial": 0,
+    "excluded_test_users": 0,
+    "excluded_young_accounts": 0,
+    "final_dataset_size": 0,
+    "churn_rate_percent": 0.0
   },
-  "daily_metrics": {
-    "YYYY-MM-DD": {
-      "control": {"transactions": 0, "successes": 0, "success_rate": 0.0},
-      "treatment": {"transactions": 0, "successes": 0, "success_rate": 0.0}
-    }
+  "model": {
+    "train_size": 0,
+    "test_size": 0
   },
-  "summary": {
-    "control": {"total_users": 0, "total_transactions": 0, "success_rate": 0.0, "total_amount": 0.0},
-    "treatment": {"total_users": 0, "total_transactions": 0, "success_rate": 0.0, "total_amount": 0.0}
+  "performance": {
+    "train_accuracy": 0.0,
+    "test_accuracy": 0.0,
+    "test_precision": 0.0,
+    "test_recall": 0.0,
+    "test_auc_roc": 0.0
   },
-  "lift": {
-    "success_rate_diff": 0.0,
-    "standard_error": 0.0,
-    "p_value": 0.0,
-    "significant": false
+  "feature_importance": {
+    "avg_login_days": 0.0,
+    "avg_features_used": 0.0,
+    "total_support_tickets": 0.0,
+    "account_age_months": 0.0,
+    "support_intensity": 0.0,
+    "login_features_interaction": 0.0
   }
 }
 
-For lift statistics, use per-user success rates: for each user, compute their success rate across their transactions, then compute the mean and variance of per-user success rates within each variant. The standard error is sqrt(var_control / n_users_control + var_treatment / n_users_treatment). Compute a two-sided p-value using normal approximation. Report all floating-point values with at least 6 significant digits.
+Use sklearn.linear_model.LogisticRegression with default parameters. Feature importance = absolute values of coefficients, normalized to sum to 1.0. Report all metrics with at least 6 significant digits.
 
 You have 300 seconds to complete this task. Do not cheat by looking up solutions online.
