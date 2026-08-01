@@ -1,15 +1,15 @@
-# Report-cleanup benchmark task
+# Payment A/B test reconciliation benchmark
 
-This repository contains a Harbor-style data-science task in which an agent must clean a messy operational export and write a single report to /app/output.json.
+This repository contains a Harbor-style A/B testing task in which an agent must reconcile payment transaction logs, apply experiment logic, and measure the treatment effect on transaction success rates.
 
 ## What the agent must do
 
 The agent receives three input files in /app/data:
-- assignments.csv for control/treatment mapping
-- events.csv for session-level events
-- bots.txt for bot-user filtering
+- transactions.csv for raw transaction logs (timestamp, user_id, transaction_id, success, amount)
+- assignments.csv for A/B test cohort assignments (control/treatment)
+- test_ids.txt for test-mode transactions to exclude
 
-The required workflow is fixed: remove duplicate events by keeping the earliest record per session, drop bot sessions, drop unassigned sessions, normalize timestamps to UTC, and compute the requested reporting metrics.
+The required workflow is fixed: deduplicate by keeping the first transaction per user, filter test and unassigned users, normalize timestamps to UTC, and compute success-rate metrics and lift statistics.
 
 ## What the reference solution provides
 
@@ -17,4 +17,4 @@ The reference oracle lives in task/solution/solve.py and task/solution/solve.sh.
 
 ## How verification works
 
-The verifier in task/tests/test_outputs.py checks the generated artifact for schema and exact values, including date range, data-quality counters, daily revenue, variant summaries, and lift statistics. The shared environment in task/environment/Dockerfile installs Python and pytest so the verifier can run inside the same container image.
+The verifier in task/tests/test_outputs.py checks the generated artifact for schema and expected summary metrics, including per-variant success rates and lift statistics. The shared environment in task/environment/Dockerfile installs Python and pytest so the verifier can run inside the same container image.

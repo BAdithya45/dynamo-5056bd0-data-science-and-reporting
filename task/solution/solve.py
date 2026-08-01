@@ -29,137 +29,164 @@ def resolve_data_dir() -> Path:
 
 def main() -> None:
     data_dir = resolve_data_dir()
+    transactions_path = data_dir / "transactions.csv"
     assignments_path = data_dir / "assignments.csv"
-    events_path = data_dir / "events.csv"
-    bots_path = data_dir / "bots.txt"
+    test_ids_path = data_dir / "test_ids.txt"
     output_path = Path("/app/output.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with assignments_path.open(encoding="utf-8") as handle:
         assignments = {row["user_id"]: row["variant"] for row in csv.DictReader(handle)}
 
-    with events_path.open(encoding="utf-8") as handle:
-        events = list(csv.DictReader(handle))
+    with transactions_path.open(encoding="utf-8") as handle:
+        transactions = list(csv.DictReader(handle))
 
-    bots = {line.strip() for line in bots_path.read_text(encoding="utf-8").splitlines() if line.strip()}
+    test_ids = {line.strip() for line in test_ids_path.read_text(encoding="utf-8").splitlines() if line.strip()}
 
-    deduped: dict[str, dict[str, str]] = {}
-    for event in events:
-        sid = event["session_id"]
-        ts = parse_ts(event["session_ts"])
-        existing = deduped.get(sid)
+    # Step 1: Keep first transaction per user (by timestamp)
+    first_per_user: dict[str, dict[str, str]] = {}
+    duplicates_per_user_removed = 0
+    for txn in transactions:
+        user_id = txn["user_id"]
+        ts = parse_ts(txn["timestamp"])
+        existing = first_per_user.get(user_id)
         if existing is None:
-            deduped[sid] = event
+            first_per_user[user_id] = txn
         else:
-            existing_ts = parse_ts(existing["session_ts"])
+            existing_ts = parse_ts(existing["timestamp"])
             if ts < existing_ts:
-                deduped[sid] = event
+                duplicates_per_user_removed += 1
+                first_per_user[user_id] = txn
+            else:
+                duplicates_per_user_removed += 1
 
+    # Step 2 & 3: Filter test users and unassigned users
     retained = []
-    duplicate_events_dropped = len(events) - len(deduped)
-    bot_sessions_removed = 0
-    unassigned_sessions_dropped = 0
+    test_transactions_excluded = 0
+    unassigned_users_excluded = 0
 
-    for event in deduped.values():
-        user_id = event["user_id"]
-        if user_id in bots:
-            bot_sessions_removed += 1
+    for txn in first_per_user.values():
+        user_id = txn["user_id"]
+        if user_id in test_ids:
+            test_transactions_excluded += 1
             continue
         if user_id not in assignments:
-            unassigned_sessions_dropped += 1
+            unassigned_users_excluded += 1
             continue
-        retained.append(event)
+        retained.append(txn)
 
-    daily_revenue: dict[str, dict[str, float]] = defaultdict(lambda: {"control": 0.0, "treatment": 0.0})
-    per_variant_users: dict[str, set[str]] = {"control": set(), "treatment": set()}
-    per_variant_sessions: dict[str, int] = {"control": 0, "treatment": 0}
-    per_variant_total_revenue: dict[str, float] = {"control": 0.0, "treatment": 0.0}
+    # Step 4: Build daily metrics and summary by variant
+    daily_metrics: dict[str, dict[str, dict[str, int | float]]] = defaultdict(
+        lambda: {"control": {"transactions": 0, "successes": 0}, "treatment": {"transactions": 0, "successes": 0}}
+    )
+    
+    variant_users: dict[str, set[str]] = {"control": set(), "treatment": set()}
+    variant_transactions: dict[str, int] = {"control": 0, "treatment": 0}
+    variant_successes: dict[str, int] = {"control": 0, "treatment": 0}
+    variant_amounts: dict[str, float] = {"control": 0.0, "treatment": 0.0}
 
-    for event in retained:
-        user_id = event["user_id"]
+    for txn in retained:
+        user_id = txn["user_id"]
         variant = assignments[user_id]
-        ts = parse_ts(event["session_ts"])
+        ts = parse_ts(txn["timestamp"])
         day = ts.strftime("%Y-%m-%d")
-        revenue = float(event["revenue"])
-        daily_revenue[day][variant] += revenue
-        per_variant_users[variant].add(user_id)
-        per_variant_sessions[variant] += 1
-        per_variant_total_revenue[variant] += revenue
+        success = txn["success"].lower() == "true"
+        amount = float(txn["amount"])
 
-    sorted_days = []
-    if retained:
-        retained_dates = sorted({parse_ts(event["session_ts"]).strftime("%Y-%m-%d") for event in retained})
-        if retained_dates:
-            start_day = retained_dates[0]
-            end_day = retained_dates[-1]
-            current = datetime.strptime(start_day, "%Y-%m-%d")
-            end = datetime.strptime(end_day, "%Y-%m-%d")
-            while current <= end:
-                day = current.strftime("%Y-%m-%d")
-                daily_revenue.setdefault(day, {"control": 0.0, "treatment": 0.0})
-                sorted_days.append(day)
-                current = current.fromordinal(current.toordinal() + 1)
-        else:
-            start_day = end_day = ""
-    else:
-        start_day = end_day = ""
+        daily_metrics[day][variant]["transactions"] += 1
+        if success:
+            daily_metrics[day][variant]["successes"] += 1
+        
+        variant_users[variant].add(user_id)
+        variant_transactions[variant] += 1
+        if success:
+            variant_successes[variant] += 1
+            variant_amounts[variant] += amount
 
-    control_means = []
-    treatment_means = []
-    for user_id in sorted(assignments):
-        user_events = [evt for evt in retained if evt["user_id"] == user_id]
-        if not user_events:
+    # Add success_rate to daily_metrics
+    for day in sorted(daily_metrics.keys()):
+        for variant in ["control", "treatment"]:
+            txns = daily_metrics[day][variant]["transactions"]
+            succs = daily_metrics[day][variant]["successes"]
+            daily_metrics[day][variant]["success_rate"] = round(succs / txns, 10) if txns > 0 else 0.0
+
+    # Compute per-variant summary
+    control_success_rate = variant_successes["control"] / variant_transactions["control"] if variant_transactions["control"] > 0 else 0.0
+    treatment_success_rate = variant_successes["treatment"] / variant_transactions["treatment"] if variant_transactions["treatment"] > 0 else 0.0
+    
+    # Compute per-user success rates and statistics
+    user_success_rates: dict[str, list[float]] = {"control": [], "treatment": []}
+    for user_id in set(list(variant_users["control"]) + list(variant_users["treatment"])):
+        user_txns = [t for t in retained if t["user_id"] == user_id]
+        if not user_txns:
             continue
-        revenue_mean = sum(float(evt["revenue"]) for evt in user_events) / len(user_events)
-        if assignments[user_id] == "control":
-            control_means.append(revenue_mean)
-        else:
-            treatment_means.append(revenue_mean)
+        user_success_count = sum(1 for t in user_txns if t["success"].lower() == "true")
+        user_rate = user_success_count / len(user_txns)
+        variant = assignments[user_id]
+        user_success_rates[variant].append(user_rate)
 
-    control_mean = sum(control_means) / len(control_means) if control_means else 0.0
-    treatment_mean = sum(treatment_means) / len(treatment_means) if treatment_means else 0.0
+    # Compute lift statistics
+    control_mean = sum(user_success_rates["control"]) / len(user_success_rates["control"]) if user_success_rates["control"] else 0.0
+    treatment_mean = sum(user_success_rates["treatment"]) / len(user_success_rates["treatment"]) if user_success_rates["treatment"] else 0.0
     diff = treatment_mean - control_mean
 
-    if len(control_means) > 1 and len(treatment_means) > 1:
-        var_control = sum((x - control_mean) ** 2 for x in control_means) / (len(control_means) - 1)
-        var_treatment = sum((x - treatment_mean) ** 2 for x in treatment_means) / (len(treatment_means) - 1)
-        se = math.sqrt(var_control / len(control_means) + var_treatment / len(treatment_means))
+    if len(user_success_rates["control"]) > 1 and len(user_success_rates["treatment"]) > 1:
+        var_control = sum((x - control_mean) ** 2 for x in user_success_rates["control"]) / (len(user_success_rates["control"]) - 1)
+        var_treatment = sum((x - treatment_mean) ** 2 for x in user_success_rates["treatment"]) / (len(user_success_rates["treatment"]) - 1)
+        se = math.sqrt(var_control / len(user_success_rates["control"]) + var_treatment / len(user_success_rates["treatment"]))
     else:
         se = 0.0
 
     z_score = diff / se if se > 0 else 0.0
     p_value = 2 * (1 - 0.5 * (1 + math.erf(abs(z_score) / math.sqrt(2)))) if se > 0 else 0.0
 
+    # Date range
+    sorted_days = sorted(daily_metrics.keys()) if daily_metrics else []
+    first_day = sorted_days[0] if sorted_days else ""
+    last_day = sorted_days[-1] if sorted_days else ""
+
     payload = {
-        "date_range": {"start": start_day, "end": end_day},
+        "date_range": {"first": first_day, "last": last_day},
         "data_quality": {
-            "duplicate_events_dropped": duplicate_events_dropped,
-            "bot_sessions_removed": bot_sessions_removed,
-            "unassigned_sessions_dropped": unassigned_sessions_dropped,
+            "duplicates_per_user_removed": duplicates_per_user_removed,
+            "test_transactions_excluded": test_transactions_excluded,
+            "unassigned_users_excluded": unassigned_users_excluded,
         },
-        "daily_revenue": {
+        "daily_metrics": {
             day: {
-                "control": round(daily_revenue[day].get("control", 0.0), 10),
-                "treatment": round(daily_revenue[day].get("treatment", 0.0), 10),
+                "control": {
+                    "transactions": daily_metrics[day]["control"]["transactions"],
+                    "successes": daily_metrics[day]["control"]["successes"],
+                    "success_rate": daily_metrics[day]["control"]["success_rate"],
+                },
+                "treatment": {
+                    "transactions": daily_metrics[day]["treatment"]["transactions"],
+                    "successes": daily_metrics[day]["treatment"]["successes"],
+                    "success_rate": daily_metrics[day]["treatment"]["success_rate"],
+                },
             }
             for day in sorted_days
         },
-        "control": {
-            "users": len(per_variant_users["control"]),
-            "sessions": per_variant_sessions["control"],
-            "total_revenue": round(per_variant_total_revenue["control"], 10),
-            "revenue_per_session": round(per_variant_total_revenue["control"] / per_variant_sessions["control"], 10) if per_variant_sessions["control"] else 0.0,
+        "summary": {
+            "control": {
+                "total_users": len(variant_users["control"]),
+                "total_transactions": variant_transactions["control"],
+                "success_rate": round(control_success_rate, 10),
+                "total_amount": round(variant_amounts["control"], 10),
+            },
+            "treatment": {
+                "total_users": len(variant_users["treatment"]),
+                "total_transactions": variant_transactions["treatment"],
+                "success_rate": round(treatment_success_rate, 10),
+                "total_amount": round(variant_amounts["treatment"], 10),
+            },
         },
-        "treatment": {
-            "users": len(per_variant_users["treatment"]),
-            "sessions": per_variant_sessions["treatment"],
-            "total_revenue": round(per_variant_total_revenue["treatment"], 10),
-            "revenue_per_session": round(per_variant_total_revenue["treatment"] / per_variant_sessions["treatment"], 10) if per_variant_sessions["treatment"] else 0.0,
+        "lift": {
+            "success_rate_diff": round(diff, 10),
+            "standard_error": round(se, 10),
+            "p_value": round(p_value, 10),
+            "significant": bool(p_value < 0.05),
         },
-        "absolute_lift": round(diff, 10),
-        "standard_error": round(se, 10),
-        "p_value": round(p_value, 10),
-        "significant_at_0.05": bool(p_value < 0.05),
     }
 
     output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

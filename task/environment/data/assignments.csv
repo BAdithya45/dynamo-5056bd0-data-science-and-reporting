@@ -1,8 +1,9 @@
 user_id,variant
 u1,control
-u2,control
+u2,treatment
 u3,control
-u4,treatment
+u4,control
 u5,treatment
 u6,treatment
 u7,treatment
+u8,treatment
