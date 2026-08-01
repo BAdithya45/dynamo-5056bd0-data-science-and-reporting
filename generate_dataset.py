@@ -2,79 +2,71 @@ import random
 from pathlib import Path
 import pandas as pd
 
-random.seed(42)
+random.seed(2026)
 
 out = Path("task/environment/data")
 out.mkdir(parents=True, exist_ok=True)
 
-airports = ["DEL","BOM","MAA","BLR","HYD","CCU"]
+airports = [
+    ("DEL", "India"),
+    ("DXB", "UAE"),
+    ("SIN", "Singapore"),
+    ("LHR", "UK"),
+    ("FRA", "Germany"),
+    ("NRT", "Japan"),
+]
 
-fleet = []
-for i in range(1,41):
-    fleet.append({
-        "aircraft_id":f"AC{i:03}",
-        "home_airport":random.choice(airports),
-        "aircraft_type":random.choice(["A320","B737","ATR72"]),
-        "age_years":random.randint(1,18)
+aircraft = []
+for i in range(1, 41):
+    aircraft.append({
+        "aircraft_id": f"AC{i:03}",
+        "home_airport": random.choice(airports)[0],
+        "capacity": random.randint(120, 320),
+        "age_years": random.randint(1, 25),
     })
 
-pd.DataFrame(fleet).to_csv(out/"aircraft.csv",index=False)
+pd.DataFrame(aircraft).to_csv(out / "aircraft.csv", index=False)
 
-flights=[]
-fid=1
+pd.DataFrame(
+    [{"airport": a, "country": c} for a, c in airports]
+).to_csv(out / "airports.csv", index=False)
 
-for a in fleet:
-    for _ in range(random.randint(8,15)):
-        dep=random.choice(airports)
-        arr=random.choice([x for x in airports if x!=dep])
-
-        delay=max(0,int(random.gauss(18,14)))
-
-        fuel=random.randint(2200,6200)
-
-        status=random.choices(
-            ["COMPLETED","DELAYED","CANCELLED"],
-            weights=[75,20,5]
-        )[0]
-
-        flights.append({
-            "flight_id":f"FL{fid:04}",
-            "aircraft_id":a["aircraft_id"],
-            "departure":dep,
-            "arrival":arr,
-            "delay_minutes":delay,
-            "fuel_used":fuel,
-            "status":status
-        })
-
-        fid+=1
-
-pd.DataFrame(flights).to_csv(out/"flight_logs.csv",index=False)
-
-maint=[]
-
-for a in fleet:
-    maint.append({
-        "aircraft_id":a["aircraft_id"],
-        "days_since_service":random.randint(1,120),
-        "maintenance_events":random.randint(0,8)
+maintenance = []
+for a in aircraft:
+    maintenance.append({
+        "aircraft_id": a["aircraft_id"],
+        "days_since_service": random.randint(1, 250),
     })
 
-pd.DataFrame(maint).to_csv(out/"maintenance.csv",index=False)
+pd.DataFrame(maintenance).to_csv(out / "maintenance.csv", index=False)
 
-aps=[]
+logs = []
+statuses = ["COMPLETED", "DELAYED", "COMPLETED", "COMPLETED", "CANCELLED"]
 
-for ap in airports:
-    aps.append({
-        "airport":ap,
-        "traffic_index":random.randint(1,10)
+for _ in range(700):
+    ac = random.choice(aircraft)["aircraft_id"]
+    dep = random.choice(airports)[0]
+    arr = random.choice(airports)[0]
+
+    while arr == dep:
+        arr = random.choice(airports)[0]
+
+    st = random.choice(statuses)
+
+    logs.append({
+        "flight_id": f"FL{random.randint(100000,999999)}",
+        "aircraft_id": ac,
+        "departure": dep,
+        "arrival": arr,
+        "status": st,
+        "delay_minutes": random.randint(0, 180),
+        "fuel_used": random.randint(3000, 18000),
     })
 
-pd.DataFrame(aps).to_csv(out/"airports.csv",index=False)
+pd.DataFrame(logs).to_csv(out / "flight_logs.csv", index=False)
 
-with open(out/"no_fly_aircraft.txt","w") as f:
-    f.write("AC005\n")
-    f.write("AC017\n")
-    f.write("AC033\n")
+with open(out / "no_fly_aircraft.txt", "w") as f:
+    f.write("AC007\n")
+    f.write("AC019\n")
 
-print("Dataset generated.")
+print("dataset regenerated")
