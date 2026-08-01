@@ -7,130 +7,114 @@ import pandas as pd
 
 
 def data_dir():
-    candidates = [
+    for p in [
         Path(__file__).resolve().parents[1] / "environment" / "data",
-        Path.cwd() / "task" / "environment" / "data",
         Path("/app/data"),
-    ]
-
-    for p in candidates:
-        if (p / "robot_events.csv").exists():
+    ]:
+        if p.exists():
             return p
 
-    raise FileNotFoundError("Could not locate robot_events.csv")
+    raise FileNotFoundError("data directory not found")
+
 
 def main():
     d = data_dir()
 
-    events = pd.read_csv(d / "robot_events.csv")
-    battery = pd.read_csv(d / "battery_history.csv")
-    queue = pd.read_csv(d / "mission_queue.csv")
+    flights = pd.read_csv(d / "flight_logs.csv")
+    aircraft = pd.read_csv(d / "aircraft.csv")
+    maint = pd.read_csv(d / "maintenance.csv")
+    airports = pd.read_csv(d / "airports.csv")
 
-    excluded = set()
+    banned = set()
 
-    with open(d / "blacklisted_robots.txt") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                excluded.add(line)
+    with open(d / "no_fly_aircraft.txt") as f:
+        for x in f:
+            x = x.strip()
+            if x:
+                banned.add(x)
 
-    events = events[~events.robot_id.isin(excluded)]
-    battery = battery[~battery.robot_id.isin(excluded)]
-    queue = queue[~queue.robot_id.isin(excluded)]
+    flights = flights[~flights.aircraft_id.isin(banned)]
 
-    keep = []
+    flights = flights[flights.status != "CANCELLED"]
 
-    for rid, g in events.groupby("robot_id"):
-        g = g.sort_values("timestamp")
+    df = flights.merge(aircraft, on="aircraft_id")
+    df = df.merge(maint, on="aircraft_id")
+    df = df.merge(airports, left_on="departure", right_on="airport")
 
-        failed = False
-
-        for _, row in g.iterrows():
-
-            if failed:
-                continue
-
-            keep.append(row)
-
-            if row["event_type"] == "HARD_FAILURE":
-                failed = True
-
-    events = pd.DataFrame(keep)
-
-    df = (
-        events.merge(battery, on="robot_id")
-        .merge(queue, on="robot_id")
+    g = (
+        df.groupby("aircraft_id")
+        .agg(
+            home_airport=("home_airport", "first"),
+            completed_flights=("status", lambda x: (x == "COMPLETED").sum()),
+            delayed_flights=("status", lambda x: (x == "DELAYED").sum()),
+            average_delay_minutes=("delay_minutes", "mean"),
+            average_fuel_used=("fuel_used", "mean"),
+            days_since_service=("days_since_service", "first"),
+        )
+        .reset_index()
     )
 
-    robots = {}
+    out = {}
 
-    low = medium = high = critical = 0
-    total_score = 0
+    ready = monitor = service = ground = 0
+    total = 0.0
 
-    for rid, g in df.groupby("robot_id"):
+    for _, r in g.iterrows():
 
-        completed = (g.event_type == "COMPLETE").sum()
-        failed = (g.event_type == "FAIL").sum()
-
-        distance = g.distance_meters.sum()
-
-        avg_battery = g.battery_percent.mean()
-
-        battery_drop = (
-            g.battery_percent.max()
-            - g.battery_percent.min()
+        maintenance_score = max(
+            0.0,
+            100.0 - r.days_since_service
         )
 
-        assigned = int(g.assigned_missions.iloc[0])
-
-        total_events = len(g)
-
-        efficiency = distance / max(1, total_events)
-
-        risk = (
-            battery_drop * 0.35
-            + failed * 8
-            + g.last_service_days.iloc[0] * 0.25
-            - efficiency * 0.15
+        utilization_score = (
+            r.completed_flights * 3
+            - r.delayed_flights * 2
         )
 
-        if risk < 20:
-            status = "LOW"
-            low += 1
-        elif risk < 40:
-            status = "MEDIUM"
-            medium += 1
-        elif risk < 60:
-            status = "HIGH"
-            high += 1
+        safety_score = (
+            100
+            - r.average_delay_minutes * 0.40
+            - r.average_fuel_used * 0.002
+            + maintenance_score * 0.20
+            + utilization_score * 0.30
+        )
+
+        if safety_score >= 95:
+            status = "READY"
+            ready += 1
+        elif safety_score >= 90:
+            status = "MONITOR"
+            monitor += 1
+        elif safety_score >= 80:
+            status = "SERVICE"
+            service += 1
         else:
-            status = "CRITICAL"
-            critical += 1
+            status = "GROUND"
+            ground += 1
 
-        total_score += risk
+        total += safety_score
 
-        robots[rid] = {
-            "assigned_missions": assigned,
-            "missions_completed": int(completed),
-            "missions_failed": int(failed),
-            "battery_drop": round(float(battery_drop), 6),
-            "efficiency_score": round(float(efficiency), 6),
-            "risk_score": round(float(risk), 6),
+        out[r.aircraft_id] = {
+            "home_airport": r.home_airport,
+            "completed_flights": int(r.completed_flights),
+            "delayed_flights": int(r.delayed_flights),
+            "average_delay_minutes": round(float(r.average_delay_minutes), 6),
+            "average_fuel_used": round(float(r.average_fuel_used), 6),
+            "maintenance_score": round(float(maintenance_score), 6),
+            "safety_score": round(float(safety_score), 6),
             "status": status,
         }
 
     result = {
-        "summary": {
-            "robots": len(robots),
-            "low": low,
-            "medium": medium,
-            "high": high,
-            "critical": critical,
-            "average_risk_score": round(
-                total_score / len(robots), 6
-            ),
+        "fleet_summary": {
+            "total_aircraft": len(out),
+            "ready": ready,
+            "monitor": monitor,
+            "service": service,
+            "ground": ground,
+            "average_safety_score": round(total / len(out), 6),
         },
-        "robots": robots,
+        "aircraft": out,
     }
 
     Path("/app/output.json").write_text(

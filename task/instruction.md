@@ -1,105 +1,101 @@
-You are a warehouse operations analyst responsible for diagnosing autonomous robot failures.
+You are an aviation operations analyst responsible for evaluating the operational safety of a commercial aircraft fleet.
 
 The directory /app/data contains:
 
-- robot_events.csv
-- battery_history.csv
-- mission_queue.csv
-- blacklisted_robots.txt
+- flight_logs.csv
+- aircraft.csv
+- maintenance.csv
+- airports.csv
+- no_fly_aircraft.txt
 
-Generate a robot fleet diagnostic report.
+Generate a fleet safety report.
 
-Perform the following operations EXACTLY in order.
+Perform the following steps in EXACTLY this order.
 
-1. Remove every robot whose robot_id appears in blacklisted_robots.txt.
+1. Remove every aircraft listed in no_fly_aircraft.txt.
 
-2. Ignore every event occurring after the first HARD_FAILURE event for that robot.
+2. Ignore every flight whose status is CANCELLED.
 
-3. Join robot_events.csv with battery_history.csv using robot_id.
+3. Join flight_logs.csv with aircraft.csv using aircraft_id.
 
-4. Join the result with mission_queue.csv using robot_id.
+4. Join the result with maintenance.csv using aircraft_id.
 
-5. Compute for every robot:
+5. Join the result with airports.csv using departure = airport.
 
-missions_completed =
-number of COMPLETE events
+6. For every aircraft compute:
 
-missions_failed =
-number of FAIL events
+completed_flights
 
-distance_travelled =
-sum(distance_meters)
+delayed_flights
 
-average_battery =
-mean(battery_percent)
+average_delay_minutes
 
-battery_drop =
-max(battery_percent) - min(battery_percent)
-
-queue_completion_rate =
-missions_completed /
-assigned_missions
-
-6. Compute
-
-efficiency_score =
-distance_travelled /
-(max(1, total_events))
+average_fuel_used
 
 7. Compute
 
-risk_score =
-battery_drop * 0.35
-+
-missions_failed * 8
-+
-(last_service_days * 0.25)
--
-(efficiency_score * 0.15)
+utilization_score =
+completed_flights × 3
+− delayed_flights × 2
 
-Round ONLY final reported values to six decimals.
+8. Compute
 
-8. Health category
+maintenance_score =
+max(0,100−days_since_service)
 
-LOW
-risk_score < 20
+9. Compute
 
-MEDIUM
-20 <= risk_score < 40
+safety_score =
+100
+− average_delay_minutes × 0.40
+− average_fuel_used × 0.002
++ maintenance_score × 0.20
++ utilization_score × 0.30
 
-HIGH
-40 <= risk_score < 60
+Round only final reported values to six decimal places.
 
-CRITICAL
+10. Assign
+
+READY
+if safety_score ≥ 95
+
+MONITOR
+if 90 ≤ safety_score < 95
+
+SERVICE
+if 80 ≤ safety_score < 90
+
+GROUND
 otherwise
 
-9. Produce
+11. Produce
 
 /app/output.json
 
 using EXACTLY this schema
 
 {
-  "summary":{
-      "robots":0,
-      "low":0,
-      "medium":0,
-      "high":0,
-      "critical":0,
-      "average_risk_score":0.0
+  "fleet_summary":{
+    "total_aircraft":0,
+    "ready":0,
+    "monitor":0,
+    "service":0,
+    "ground":0,
+    "average_safety_score":0.0
   },
 
-  "robots":{
-      "RB001":{
-          "assigned_missions":0,
-          "missions_completed":0,
-          "missions_failed":0,
-          "battery_drop":0.0,
-          "efficiency_score":0.0,
-          "risk_score":0.0,
-          "status":""
-      }
+  "aircraft":{
+    "AC001":{
+      "home_airport":"",
+      "completed_flights":0,
+      "delayed_flights":0,
+      "average_delay_minutes":0.0,
+      "average_fuel_used":0.0,
+      "maintenance_score":0.0,
+      "safety_score":0.0,
+      "status":""
+    }
   }
 }
 
-Only produce the JSON artifact.
+Only output the JSON artifact.

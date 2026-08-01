@@ -1,42 +1,43 @@
 artifacts = ["/app/output.json"]
 
 [task]
-name = "dynamo/warehouse-robot-diagnostics"
-description = "Analyze warehouse robot operations and generate a fleet diagnostic report."
+name = "dynamo/airport-fleet-safety-reporting"
+description = "Analyze commercial aircraft operational data and generate a structured fleet safety report."
 
 [metadata]
 category = "Data Science and Reporting"
-subcategory = "Operational analytics"
+subcategory = "Fleet analytics and operational reporting"
 
 model_tested = "GPT-5.4"
 agent_tested = "Terminus-2"
 
-task_objective = ["transform","validate"]
+task_objective = ["transform", "aggregate", "report"]
 
 artifact_type = [
-"dataset_or_tabular_file",
-"generated_output_artifact",
-"single_script_or_program"
+  "dataset_or_tabular_file",
+  "generated_output_artifact",
+  "single_script_or_program"
 ]
 
 expert_time_estimate_hours = 1
 
-difficulty_explanation = "Requires event reconstruction, ordered filtering, joins, fleet analytics and deterministic JSON generation."
+difficulty_explanation = "The task requires filtering records, joining multiple datasets, computing operational metrics, deriving safety scores, classifying aircraft, and producing a deterministic JSON report."
 
-solution_explanation = "Merge multiple datasets, truncate event history after failures, compute operational metrics and serialize the report."
+solution_explanation = "Load the datasets, remove restricted aircraft and cancelled flights, merge operational and maintenance information, compute fleet statistics and safety scores, classify aircraft status, and serialize the required JSON artifact."
 
-verification_explanation = "Verifier checks schema, statistics and calculated fleet metrics."
+verification_explanation = "The verifier checks the output schema, computed fleet statistics, aircraft classifications, and numerical correctness of the generated report."
 
 [verifier]
-timeout_sec = 300
+timeout_sec = 300.0
 
 [agent]
-timeout_sec = 600
+timeout_sec = 600.0
 
 [environment]
-build_timeout_sec = 600
+build_timeout_sec = 600.0
 cpus = 1
 memory_mb = 2048
 storage_mb = 10240
+gpus = 0
 allow_internet = true
 mcp_servers = []

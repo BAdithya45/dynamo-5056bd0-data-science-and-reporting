@@ -2,43 +2,42 @@ import json
 from pathlib import Path
 
 
-def load():
-    return json.loads(Path("/app/output.json").read_text())
-
-
 def test_output_exists():
     assert Path("/app/output.json").exists()
 
 
 def test_schema():
-    d = load()
 
-    assert "summary" in d
-    assert "robots" in d
+    data = json.loads(Path("/app/output.json").read_text())
 
-    s = d["summary"]
+    assert "fleet_summary" in data
+    assert "aircraft" in data
 
-    assert "robots" in s
-    assert "low" in s
-    assert "medium" in s
-    assert "high" in s
-    assert "critical" in s
-    assert "average_risk_score" in s
+    s = data["fleet_summary"]
 
-    assert isinstance(d["robots"], dict)
+    assert "total_aircraft" in s
+    assert "ready" in s
+    assert "monitor" in s
+    assert "service" in s
+    assert "ground" in s
+    assert "average_safety_score" in s
 
-    for robot in d["robots"].values():
-        assert "assigned_missions" in robot
-        assert "missions_completed" in robot
-        assert "missions_failed" in robot
-        assert "battery_drop" in robot
-        assert "efficiency_score" in robot
-        assert "risk_score" in robot
-        assert "status" in robot
+    assert isinstance(data["aircraft"], dict)
 
-        assert robot["status"] in {
-            "LOW",
-            "MEDIUM",
-            "HIGH",
-            "CRITICAL",
+    for a in data["aircraft"].values():
+
+        assert "home_airport" in a
+        assert "completed_flights" in a
+        assert "delayed_flights" in a
+        assert "average_delay_minutes" in a
+        assert "average_fuel_used" in a
+        assert "maintenance_score" in a
+        assert "safety_score" in a
+        assert "status" in a
+
+        assert a["status"] in {
+            "READY",
+            "MONITOR",
+            "SERVICE",
+            "GROUND",
         }

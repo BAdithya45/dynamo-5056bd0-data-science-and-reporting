@@ -1,33 +1,30 @@
-# Warehouse Robot Fleet Diagnostics Benchmark
+# Airport Fleet Safety Reporting Benchmark
 
-This benchmark evaluates an autonomous warehouse robot fleet.
+This benchmark evaluates an AI agent's ability to analyze commercial aircraft operations and generate a structured fleet safety report.
 
 ## Input Files
 
-- robot_events.csv
-- battery_history.csv
-- mission_queue.csv
-- blacklisted_robots.txt
+The benchmark provides:
 
-## Workflow
+- flight_logs.csv
+- aircraft.csv
+- maintenance.csv
+- airports.csv
+- no_fly_aircraft.txt
 
-The agent must
+## Required Workflow
 
-1. Remove blacklisted robots
-2. Ignore events after the first hard failure
-3. Merge operational datasets
-4. Compute robot efficiency metrics
-5. Calculate battery degradation
-6. Compute risk scores
-7. Categorize robot health
-8. Produce `/app/output.json`
+The agent must:
+
+1. Remove restricted aircraft.
+2. Ignore cancelled flights.
+3. Join all datasets.
+4. Compute operational statistics.
+5. Calculate maintenance scores.
+6. Compute safety scores.
+7. Assign fleet status labels.
+8. Produce `/app/output.json`.
 
 ## Verification
 
-The verifier checks
-
-- output schema
-- robot statistics
-- calculated efficiency metrics
-- risk scores
-- category counts
+The verifier validates the output JSON schema together with the computed fleet statistics and safety metrics.
