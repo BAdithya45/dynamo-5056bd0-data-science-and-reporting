@@ -1,8 +1,8 @@
 artifacts = ["/app/output.json"]  # paths the verifier reads from the agent (e.g. ["/app/output.json"]) — must be above the first [section]
 
 [task]
-name = "dynamo/payment-ab-reconcile"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
-description = "Reconcile payment transaction logs and measure A/B test success-rate lift."                 # one-line summary of the task
+name = "dynamo/customer-churn-prediction"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
+description = "Build a logistic regression model to predict customer churn using behavioral and account features."                 # one-line summary of the task
 
 [metadata]
 # --- Pre-seeded for you when this repo was created — DO NOT EDIT ---
@@ -16,9 +16,9 @@ agent_tested = "Terminus-2"        # difficulty-benchmarking agent (do not chang
 task_objective = ["transform", "validate"]                # e.g. ["implement", "debug"]
 artifact_type = ["dataset_or_tabular_file", "generated_output_artifact", "single_script_or_program"]                 # e.g. ["codebase", "configuration_file"]
 expert_time_estimate_hours = 1     # best-case hours for a focused domain expert with the intended insight
-difficulty_explanation = "The challenge is not just file parsing: the agent must apply a fixed cleaning sequence in the right order (deduplication per user, exclusion of test/unassigned), normalize timestamps to UTC, and compute a clustered uncertainty estimate using the correct unit of analysis (per-user success rates)."        # why this task is hard for agents and humans
-solution_explanation = "Load the transaction, assignment, and test-id inputs; deduplicate and filter in the required order; aggregate by UTC day and variant; compute success rates; and estimate lift with standard error and p-value from per-user success rate distributions."          # high-level approach and key insights
-verification_explanation = "The verifier asserts the exact schema and values for the date range, data-quality counters, daily metrics, variant summaries, and the lift statistics in /app/output.json."      # how the tests verify correctness
+difficulty_explanation = "The challenge requires merging three datasets, applying a multi-step cleaning process (age filtering, exclusion lists, aggregation), engineering features (interaction terms, ratios), and training a logistic regression model with proper train/test split. Computing normalized feature importance scores tests the agent's ML pipeline understanding."        # why this task is hard for agents and humans
+solution_explanation = "Load customer attributes, usage metrics, and churn labels; filter by account age and exclusion list; aggregate monthly usage to customer level; engineer interaction and intensity features; train logistic regression on 80/20 split; compute normalized feature importance from absolute coefficient values."          # high-level approach and key insights
+verification_explanation = "The verifier asserts the exact schema and values for dataset counters, model split sizes, performance metrics (accuracy/precision/recall/AUC), and normalized feature importance scores in /app/output.json."      # how the tests verify correctness
 
 [verifier]
 timeout_sec = 300.0                # increase based on your test suite's runtime demands
