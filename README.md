@@ -2,6 +2,8 @@
 
 This repository contains a Harbor-style A/B testing task in which an agent must reconcile payment transaction logs, apply experiment logic, and measure the treatment effect on transaction success rates.
 
+**Task**: Dynamo benchmark for payment transaction data processing and A/B test analysis.
+
 ## What the agent must do
 
 The agent receives three input files in /app/data:
