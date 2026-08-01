@@ -1,8 +1,8 @@
 artifacts = ["/app/output.json"]  # paths the verifier reads from the agent (e.g. ["/app/output.json"]) — must be above the first [section]
 
 [task]
-name = "dynamo/customer-churn-prediction"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
-description = "Build a logistic regression model to predict customer churn using behavioral and account features."                 # one-line summary of the task
+name = "dynamo/manufacturing-quality-control"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
+description = "Analyze manufacturing quality metrics and identify equipment performance issues."                 # one-line summary of the task
 
 [metadata]
 # --- Pre-seeded for you when this repo was created — DO NOT EDIT ---
@@ -16,9 +16,9 @@ agent_tested = "Terminus-2"        # difficulty-benchmarking agent (do not chang
 task_objective = ["transform", "validate"]                # e.g. ["implement", "debug"]
 artifact_type = ["dataset_or_tabular_file", "generated_output_artifact", "single_script_or_program"]                 # e.g. ["codebase", "configuration_file"]
 expert_time_estimate_hours = 1     # best-case hours for a focused domain expert with the intended insight
-difficulty_explanation = "The challenge requires merging three datasets, applying a multi-step cleaning process (age filtering, exclusion lists, aggregation), engineering features (interaction terms, ratios), and training a logistic regression model with proper train/test split. Computing normalized feature importance scores tests the agent's ML pipeline understanding."        # why this task is hard for agents and humans
-solution_explanation = "Load customer attributes, usage metrics, and churn labels; filter by account age and exclusion list; aggregate monthly usage to customer level; engineer interaction and intensity features; train logistic regression on 80/20 split; compute normalized feature importance from absolute coefficient values."          # high-level approach and key insights
-verification_explanation = "The verifier asserts the exact schema and values for dataset counters, model split sizes, performance metrics (accuracy/precision/recall/AUC), and normalized feature importance scores in /app/output.json."      # how the tests verify correctness
+difficulty_explanation = "The challenge requires merging three datasets (production batches, defects, equipment specifications), applying multi-step filtering (exclusion lists, incomplete batches, invalid maintenance dates), computing equipment-level defect rates and quality scores, and performing trend analysis using linear regression. The health index formula combines multiple metrics requiring careful aggregation."        # why this task is hard for agents and humans
+solution_explanation = "Load production batches, defect reports, and equipment specs; filter excluded batches and incomplete runs; merge on batch_id and equipment_id; compute per-equipment defect rates, quality scores, severity averages; use linear regression to detect trend patterns (ascending/descending/stable); calculate health index from weighted quality and severity components; identify critical and deteriorating equipment based on thresholds."          # high-level approach and key insights
+verification_explanation = "The verifier asserts the exact schema and values for summary counters, equipment performance metrics (defect rates, quality scores, severity, health index, trend analysis), and alert lists in /app/output.json."      # how the tests verify correctness
 
 [verifier]
 timeout_sec = 300.0                # increase based on your test suite's runtime demands

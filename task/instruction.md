@@ -1,53 +1,54 @@
-You have customer data and need to predict churn. You are given three CSV files containing customer attributes, monthly usage metrics, and churn labels. Your task is to: (1) clean and validate the data, (2) engineer features for a predictive model, (3) train a logistic regression classifier, (4) evaluate model performance, and (5) compute feature importance.
+You are analyzing manufacturing quality metrics from factory production lines. You have three CSV files: production records, defect reports, and equipment specifications. Your job is to: (1) clean and validate quality data, (2) compute defect rates and quality scores, (3) identify problematic equipment, (4) generate quality control summary, and (5) forecast trend direction.
 
 Files in /app/data:
-- customers.csv: customer_id, account_age_months, subscription_tier (basic/premium/enterprise), region (US/EU/APAC)
-- usage.csv: customer_id, month, login_days, features_used, support_tickets, payment_method (card/ach/paypal)
-- churn.csv: customer_id, churned (0/1)
+- production.csv: batch_id, equipment_id, shift (morning/afternoon/night), units_produced, timestamp (ISO 8601 UTC)
+- defects.csv: batch_id, defect_count, defect_type (material/alignment/wear), severity (1-5)
+- equipment.csv: equipment_id, installation_date (YYYY-MM-DD), model (TypeA/TypeB/TypeC), maintenance_days_ago
+- excluded_batches.txt: test batch IDs to exclude from analysis
 
 Data cleaning (in order):
-1. Remove customers with account_age_months < 3 (excluded from churn analysis).
-2. Remove customers in the exclusion list (test_customers.txt).
-3. For each customer, aggregate usage.csv to compute: avg_login_days, avg_features_used, total_support_tickets over all months.
-4. Merge the three datasets; drop rows with missing values.
+1. Remove batches listed in excluded_batches.txt (test runs).
+2. Filter out batches with units_produced < 10 (incomplete runs).
+3. Remove equipment with maintenance_days_ago < 0 (invalid maintenance dates).
+4. Merge production and defects on batch_id; keep rows with valid defect data.
+5. Group by equipment_id and compute: avg_defect_rate (defects/units), avg_severity, total_defects.
 
-Feature engineering:
-- Create interaction: (login_days) × (features_used)
-- Create: support_intensity = support_tickets / account_age_months
-- Encode categorical: subscription_tier and region as binary (one-hot)
+Metric computation:
+- defect_rate_percent = (total_defects / total_units_produced) * 100
+- quality_score = 100 - defect_rate_percent (capped at 100)
+- severity_score = avg_severity (normalized 0-1, divided by 5)
+- equipment_health_index = quality_score * 0.7 + (100 - severity_score * 100) * 0.3
 
-Train logistic regression on 80% of data (random split, seed=42). Evaluate on 20% test set.
+Trend analysis: For each equipment, compute defect trend (ascending/descending/stable) using linear regression on defect_rate over batches (R-squared threshold > 0.3 for trend confidence).
 
 Produce a JSON report at /app/output.json with this schema:
 {
-  "dataset": {
-    "total_customers_initial": 0,
-    "excluded_test_users": 0,
-    "excluded_young_accounts": 0,
-    "final_dataset_size": 0,
-    "churn_rate_percent": 0.0
+  "summary": {
+    "total_batches_processed": 0,
+    "excluded_test_batches": 0,
+    "excluded_incomplete_batches": 0,
+    "equipment_count": 0,
+    "overall_defect_rate_percent": 0.0,
+    "overall_quality_score": 0.0
   },
-  "model": {
-    "train_size": 0,
-    "test_size": 0
+  "equipment_performance": {
+    "equipment_id": {
+      "total_units": 0,
+      "total_defects": 0,
+      "defect_rate_percent": 0.0,
+      "quality_score": 0.0,
+      "avg_severity": 0.0,
+      "health_index": 0.0,
+      "trend": "ascending|descending|stable",
+      "trend_confidence": 0.0
+    }
   },
-  "performance": {
-    "train_accuracy": 0.0,
-    "test_accuracy": 0.0,
-    "test_precision": 0.0,
-    "test_recall": 0.0,
-    "test_auc_roc": 0.0
-  },
-  "feature_importance": {
-    "avg_login_days": 0.0,
-    "avg_features_used": 0.0,
-    "total_support_tickets": 0.0,
-    "account_age_months": 0.0,
-    "support_intensity": 0.0,
-    "login_features_interaction": 0.0
+  "alerts": {
+    "critical_equipment": [],
+    "deteriorating_equipment": []
   }
 }
 
-Use sklearn.linear_model.LogisticRegression with default parameters. Feature importance = absolute values of coefficients, normalized to sum to 1.0. Report all metrics with at least 6 significant digits.
+Critical equipment: quality_score < 85 or avg_severity > 3.5. Deteriorating: trend = "ascending" and trend_confidence > 0.5.
 
-You have 300 seconds to complete this task. Do not cheat by looking up solutions online.
+Report all metrics with at least 6 significant digits. You have 300 seconds to complete this task.
