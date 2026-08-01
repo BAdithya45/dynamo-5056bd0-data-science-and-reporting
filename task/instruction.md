@@ -1,91 +1,105 @@
-You are an industrial reliability engineer responsible for assessing the health of factory sensors.
+You are a warehouse operations analyst responsible for diagnosing autonomous robot failures.
 
-The directory /app/data contains four files:
+The directory /app/data contains:
 
-- sensor_readings.csv
-- calibration_history.csv
-- maintenance_records.csv
-- excluded_sensors.txt
+- robot_events.csv
+- battery_history.csv
+- mission_queue.csv
+- blacklisted_robots.txt
 
-Your objective is to generate a complete sensor reliability report.
+Generate a robot fleet diagnostic report.
 
-Perform the following operations in EXACTLY this order.
+Perform the following operations EXACTLY in order.
 
-1. Remove every sensor whose sensor_id appears in excluded_sensors.txt.
+1. Remove every robot whose robot_id appears in blacklisted_robots.txt.
 
-2. Ignore any reading whose current_value is less than or equal to zero.
+2. Ignore every event occurring after the first HARD_FAILURE event for that robot.
 
-3. Join sensor_readings.csv with calibration_history.csv using sensor_id.
+3. Join robot_events.csv with battery_history.csv using robot_id.
 
-4. Join the result with maintenance_records.csv using sensor_id.
+4. Join the result with mission_queue.csv using robot_id.
 
-5. Compute:
+5. Compute for every robot:
 
-drift =
-abs(current_value - calibrated_value)
+missions_completed =
+number of COMPLETE events
 
-6. For every sensor compute
+missions_failed =
+number of FAIL events
 
-average_drift
+distance_travelled =
+sum(distance_meters)
 
-using all remaining readings.
+average_battery =
+mean(battery_percent)
 
-7. Compute the maintenance freshness score
+battery_drop =
+max(battery_percent) - min(battery_percent)
 
-maintenance_score =
-max(0, 100 - last_maintenance_days)
+queue_completion_rate =
+missions_completed /
+assigned_missions
 
-8. Compute the reliability index
+6. Compute
 
-reliability_index =
-100
-- (average_drift × 12)
-- (last_calibration_days × 0.25)
-+ (maintenance_score × 0.10)
+efficiency_score =
+distance_travelled /
+(max(1, total_events))
 
-Round ONLY the final reported values to six decimal places.
+7. Compute
 
-9. Assign a health category
+risk_score =
+battery_drop * 0.35
++
+missions_failed * 8
++
+(last_service_days * 0.25)
+-
+(efficiency_score * 0.15)
 
-EXCELLENT
-reliability_index ≥ 95
+Round ONLY final reported values to six decimals.
 
-GOOD
-90 ≤ reliability_index < 95
+8. Health category
 
-WARNING
-80 ≤ reliability_index < 90
+LOW
+risk_score < 20
+
+MEDIUM
+20 <= risk_score < 40
+
+HIGH
+40 <= risk_score < 60
 
 CRITICAL
 otherwise
 
-10. Produce
+9. Produce
 
 /app/output.json
 
-using EXACTLY the following schema.
+using EXACTLY this schema
 
 {
-  "summary": {
-    "total_sensors": 0,
-    "excellent": 0,
-    "good": 0,
-    "warning": 0,
-    "critical": 0,
-    "average_reliability_index": 0.0
+  "summary":{
+      "robots":0,
+      "low":0,
+      "medium":0,
+      "high":0,
+      "critical":0,
+      "average_risk_score":0.0
   },
 
-  "sensors": {
-    "sensor_id": {
-      "production_line": "",
-      "average_drift": 0.0,
-      "maintenance_score": 0.0,
-      "reliability_index": 0.0,
-      "health": ""
-    }
+  "robots":{
+      "RB001":{
+          "assigned_missions":0,
+          "missions_completed":0,
+          "missions_failed":0,
+          "battery_drop":0.0,
+          "efficiency_score":0.0,
+          "risk_score":0.0,
+          "status":""
+      }
   }
 }
 
-Only output the JSON artifact.
-
-You have 300 seconds.
+Only produce the JSON artifact.

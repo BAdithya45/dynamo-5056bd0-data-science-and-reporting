@@ -1,0 +1,6 @@
+robot_id,last_service_days,max_capacity
+RB001,12,100
+RB002,45,100
+RB003,90,100
+RB004,25,100
+RB005,65,100

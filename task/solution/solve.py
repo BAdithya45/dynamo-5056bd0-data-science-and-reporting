@@ -7,103 +7,135 @@ import pandas as pd
 
 
 def data_dir():
-    for p in [
-        Path("/app/data"),
+    candidates = [
         Path(__file__).resolve().parents[1] / "environment" / "data",
-    ]:
-        if p.exists():
-            return p
-    raise FileNotFoundError("data directory not found")
+        Path.cwd() / "task" / "environment" / "data",
+        Path("/app/data"),
+    ]
 
+    for p in candidates:
+        if (p / "robot_events.csv").exists():
+            return p
+
+    raise FileNotFoundError("Could not locate robot_events.csv")
 
 def main():
     d = data_dir()
 
-    readings = pd.read_csv(d / "sensor_readings.csv")
-    calib = pd.read_csv(d / "calibration_history.csv")
-    maint = pd.read_csv(d / "maintenance_records.csv")
+    events = pd.read_csv(d / "robot_events.csv")
+    battery = pd.read_csv(d / "battery_history.csv")
+    queue = pd.read_csv(d / "mission_queue.csv")
 
     excluded = set()
 
-    with open(d / "excluded_sensors.txt") as f:
-        for x in f:
-            x = x.strip()
-            if x:
-                excluded.add(x)
+    with open(d / "blacklisted_robots.txt") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                excluded.add(line)
 
-    readings = readings[~readings.sensor_id.isin(excluded)]
+    events = events[~events.robot_id.isin(excluded)]
+    battery = battery[~battery.robot_id.isin(excluded)]
+    queue = queue[~queue.robot_id.isin(excluded)]
 
-    readings = readings[readings.current_value > 0]
+    keep = []
 
-    df = readings.merge(calib, on="sensor_id", how="inner")
-    df = df.merge(maint, on="sensor_id", how="inner")
+    for rid, g in events.groupby("robot_id"):
+        g = g.sort_values("timestamp")
 
-    df["drift"] = (df["current_value"] - df["calibrated_value"]).abs()
+        failed = False
 
-    g = (
-        df.groupby("sensor_id")
-        .agg(
-            production_line=("production_line", "first"),
-            average_drift=("drift", "mean"),
-            last_calibration_days=("last_calibration_days", "first"),
-            last_maintenance_days=("last_maintenance_days", "first"),
-        )
-        .reset_index()
+        for _, row in g.iterrows():
+
+            if failed:
+                continue
+
+            keep.append(row)
+
+            if row["event_type"] == "HARD_FAILURE":
+                failed = True
+
+    events = pd.DataFrame(keep)
+
+    df = (
+        events.merge(battery, on="robot_id")
+        .merge(queue, on="robot_id")
     )
 
-    out = {}
+    robots = {}
 
-    ex = good = warn = crit = 0
+    low = medium = high = critical = 0
+    total_score = 0
 
-    total_index = 0
+    for rid, g in df.groupby("robot_id"):
 
-    for _, r in g.iterrows():
+        completed = (g.event_type == "COMPLETE").sum()
+        failed = (g.event_type == "FAIL").sum()
 
-        maintenance_score = max(0.0, 100.0 - r.last_maintenance_days)
+        distance = g.distance_meters.sum()
 
-        reliability = (
-            100
-            - r.average_drift * 12
-            - r.last_calibration_days * 0.25
-            + maintenance_score * 0.10
+        avg_battery = g.battery_percent.mean()
+
+        battery_drop = (
+            g.battery_percent.max()
+            - g.battery_percent.min()
         )
 
-        if reliability >= 95:
-            health = "EXCELLENT"
-            ex += 1
-        elif reliability >= 90:
-            health = "GOOD"
-            good += 1
-        elif reliability >= 80:
-            health = "WARNING"
-            warn += 1
+        assigned = int(g.assigned_missions.iloc[0])
+
+        total_events = len(g)
+
+        efficiency = distance / max(1, total_events)
+
+        risk = (
+            battery_drop * 0.35
+            + failed * 8
+            + g.last_service_days.iloc[0] * 0.25
+            - efficiency * 0.15
+        )
+
+        if risk < 20:
+            status = "LOW"
+            low += 1
+        elif risk < 40:
+            status = "MEDIUM"
+            medium += 1
+        elif risk < 60:
+            status = "HIGH"
+            high += 1
         else:
-            health = "CRITICAL"
-            crit += 1
+            status = "CRITICAL"
+            critical += 1
 
-        total_index += reliability
+        total_score += risk
 
-        out[r.sensor_id] = {
-            "production_line": r.production_line,
-            "average_drift": round(float(r.average_drift), 6),
-            "maintenance_score": round(float(maintenance_score), 6),
-            "reliability_index": round(float(reliability), 6),
-            "health": health,
+        robots[rid] = {
+            "assigned_missions": assigned,
+            "missions_completed": int(completed),
+            "missions_failed": int(failed),
+            "battery_drop": round(float(battery_drop), 6),
+            "efficiency_score": round(float(efficiency), 6),
+            "risk_score": round(float(risk), 6),
+            "status": status,
         }
 
     result = {
         "summary": {
-            "total_sensors": len(out),
-            "excellent": ex,
-            "good": good,
-            "warning": warn,
-            "critical": crit,
-            "average_reliability_index": round(total_index / len(out), 6),
+            "robots": len(robots),
+            "low": low,
+            "medium": medium,
+            "high": high,
+            "critical": critical,
+            "average_risk_score": round(
+                total_score / len(robots), 6
+            ),
         },
-        "sensors": out,
+        "robots": robots,
     }
 
-    Path("/app/output.json").write_text(json.dumps(result, indent=2))
+    Path("/app/output.json").write_text(
+        json.dumps(result, indent=2)
+    )
 
 
 if __name__ == "__main__":

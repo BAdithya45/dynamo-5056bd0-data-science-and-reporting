@@ -1,29 +1,33 @@
-# Sensor Reliability Reporting Benchmark
+# Warehouse Robot Fleet Diagnostics Benchmark
 
-This benchmark requires an agent to analyze industrial sensor data and generate a structured reliability report.
+This benchmark evaluates an autonomous warehouse robot fleet.
 
 ## Input Files
 
-The task provides:
+- robot_events.csv
+- battery_history.csv
+- mission_queue.csv
+- blacklisted_robots.txt
 
-- sensor_readings.csv
-- calibration_history.csv
-- maintenance_records.csv
-- excluded_sensors.txt
+## Workflow
 
-## Required Workflow
+The agent must
 
-The agent must:
-
-1. Remove excluded sensors.
-2. Ignore invalid readings.
-3. Join all datasets.
-4. Compute sensor drift.
-5. Calculate maintenance scores.
-6. Compute reliability indices.
-7. Classify sensor health.
-8. Produce `/app/output.json`.
+1. Remove blacklisted robots
+2. Ignore events after the first hard failure
+3. Merge operational datasets
+4. Compute robot efficiency metrics
+5. Calculate battery degradation
+6. Compute risk scores
+7. Categorize robot health
+8. Produce `/app/output.json`
 
 ## Verification
 
-The verifier checks the generated JSON schema along with the computed reliability metrics and summary statistics.
+The verifier checks
+
+- output schema
+- robot statistics
+- calculated efficiency metrics
+- risk scores
+- category counts

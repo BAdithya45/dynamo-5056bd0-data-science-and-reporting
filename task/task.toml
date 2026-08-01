@@ -1,42 +1,42 @@
 artifacts = ["/app/output.json"]
 
 [task]
-name = "dynamo/loan-risk-reporting"
-description = "Analyze a loan portfolio and generate a structured risk report."
+name = "dynamo/warehouse-robot-diagnostics"
+description = "Analyze warehouse robot operations and generate a fleet diagnostic report."
 
 [metadata]
 category = "Data Science and Reporting"
-subcategory = "Dataset preparation for analysis"
+subcategory = "Operational analytics"
 
 model_tested = "GPT-5.4"
 agent_tested = "Terminus-2"
 
-task_objective = ["transform", "validate"]
+task_objective = ["transform","validate"]
+
 artifact_type = [
-  "dataset_or_tabular_file",
-  "generated_output_artifact",
-  "single_script_or_program"
+"dataset_or_tabular_file",
+"generated_output_artifact",
+"single_script_or_program"
 ]
 
 expert_time_estimate_hours = 1
 
-difficulty_explanation = "The task requires joining multiple datasets, applying ordered filtering rules, computing repayment metrics, assigning categorical risk levels, and generating an exact JSON report with deterministic values."
+difficulty_explanation = "Requires event reconstruction, ordered filtering, joins, fleet analytics and deterministic JSON generation."
 
-solution_explanation = "Load the four input files, remove excluded loans, merge borrowers, loans, and repayment records, compute repayment statistics, classify each loan into a risk category, aggregate summary statistics, and serialize the required JSON artifact."
+solution_explanation = "Merge multiple datasets, truncate event history after failures, compute operational metrics and serialize the report."
 
-verification_explanation = "The verifier checks the exact output schema, computed repayment metrics, risk classifications, summary counts, and numerical values in /app/output.json."
+verification_explanation = "Verifier checks schema, statistics and calculated fleet metrics."
 
 [verifier]
-timeout_sec = 300.0
+timeout_sec = 300
 
 [agent]
-timeout_sec = 600.0
+timeout_sec = 600
 
 [environment]
-build_timeout_sec = 600.0
+build_timeout_sec = 600
 cpus = 1
 memory_mb = 2048
 storage_mb = 10240
-gpus = 0
 allow_internet = true
 mcp_servers = []
