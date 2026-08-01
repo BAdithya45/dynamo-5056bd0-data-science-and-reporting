@@ -1,32 +1,32 @@
-artifacts = []  # paths the verifier reads from the agent (e.g. ["/app/output.json"]) — must be above the first [section]
+artifacts = ["/app/output.json"]  # paths the verifier reads from the agent (e.g. ["/app/output.json"]) — must be above the first [section]
 
 [task]
-name = "dynamo/your-task-name"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
-description = ""                 # one-line summary of the task
+name = "dynamo/report-cleanup"  # required format: org/name (Harbor needs the slash); name part lowercase kebab-case, <=3 words
+description = "Clean operational event exports and generate a treatment-control reporting summary."                 # one-line summary of the task
 
 [metadata]
 # --- Pre-seeded for you when this repo was created — DO NOT EDIT ---
 category = "Data Science and Reporting"                      # diversity category, assigned to your task by the Dynamo team
 subcategory = "Dataset preparation for analysis"                   # diversity subcategory, assigned by the Dynamo team
 # --- Fixed for this dataset — LEAVE AS-IS ---
-model_tested = "Opus-4.8"           # difficulty-benchmarking model (do not change)
+model_tested = "GPT-5.4"           # difficulty-benchmarking model (do not change)
 agent_tested = "Terminus-2"        # difficulty-benchmarking agent (do not change)
 # --- You fill these in ---
 # task_objective / artifact_type: pick from .dynamo/diversity-taxonomy.toml (lowercase snake_case).
-task_objective = []                # e.g. ["implement", "debug"]
-artifact_type = []                 # e.g. ["codebase", "configuration_file"]
-expert_time_estimate_hours = 0     # best-case hours for a focused domain expert with the intended insight
-difficulty_explanation = ""        # why this task is hard for agents and humans
-solution_explanation = ""          # high-level approach and key insights
-verification_explanation = ""      # how the tests verify correctness
+task_objective = ["transform", "validate"]                # e.g. ["implement", "debug"]
+artifact_type = ["dataset_or_tabular_file", "generated_output_artifact", "single_script_or_program"]                 # e.g. ["codebase", "configuration_file"]
+expert_time_estimate_hours = 1     # best-case hours for a focused domain expert with the intended insight
+difficulty_explanation = "The challenge is not just file parsing: the agent must apply a fixed cleaning sequence in the right order, normalize timestamps to UTC, and compute a clustered uncertainty estimate using the correct unit of analysis."        # why this task is hard for agents and humans
+solution_explanation = "Load the assignment, event, and bot inputs; deduplicate and filter in the required order; aggregate by UTC day and variant; and compute lift, standard error, p-value, and significance from the cleaned data."          # high-level approach and key insights
+verification_explanation = "The verifier asserts the exact schema and values for the date range, data-quality counters, daily revenue, variant-level summaries, and the lift statistics in /app/output.json."      # how the tests verify correctness
 
 [verifier]
-timeout_sec = 120.0                # increase based on your test suite's runtime demands
+timeout_sec = 300.0                # increase based on your test suite's runtime demands
 # Canonical TB2: the verifier runs in the environment image (no separate tests/Dockerfile).
 # Harbor overlays tests/ at verify time; leave environment_mode unset for this shared model.
 
 [agent]
-timeout_sec = 120.0                # raise for hard tasks — agents may run for many minutes or hours
+timeout_sec = 300.0                # raise for hard tasks — agents may run for many minutes or hours
 
 [environment]
 build_timeout_sec = 600.0          # max seconds for the Docker build

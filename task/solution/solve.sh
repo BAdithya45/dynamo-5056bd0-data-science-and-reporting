@@ -1,8 +1,11 @@
 #!/bin/bash
-#
-# Your reference (Oracle) solution — it must correctly complete the task, proving the
-# task is solvable. Harbor mounts solution/ at /solution/ and runs this script.
-# Put the real logic in helpers (e.g. solution/solve.py) and call them from here, and
-# write outputs to the absolute paths named in instruction.md (e.g. /app/output.json).
-
-# e.g.: python3 /solution/solve.py
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f /solution/solve.py ]]; then
+  python3 /solution/solve.py
+elif [[ -f "$SCRIPT_DIR/solve.py" ]]; then
+  python3 "$SCRIPT_DIR/solve.py"
+else
+  echo "solve.py not found" >&2
+  exit 1
+fi

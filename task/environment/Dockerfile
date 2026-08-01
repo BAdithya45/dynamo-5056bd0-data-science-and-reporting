@@ -15,9 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
     && pip install --no-cache-dir --break-system-packages pytest==8.4.1 pytest-json-ctrf==0.3.5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Example (task-specific system packages / input data):
-# RUN apt-get update && apt-get install -y --no-install-recommends <packages> \
-#     && rm -rf /var/lib/apt/lists/*
-# COPY data /app/data
+# Task input data is copied into the image and made available at /app/data.
+COPY task/environment/data /app/data
+RUN mkdir -p /app
 
 WORKDIR /app
